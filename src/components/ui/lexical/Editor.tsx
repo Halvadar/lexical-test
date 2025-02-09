@@ -25,11 +25,15 @@ import {
   TextNode,
 } from "lexical";
 import { ListItemNode, ListNode } from "@lexical/list";
+import { useEffect } from "react";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 
 import ExampleTheme from "./ExampleTheme";
 import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import { parseAllowedColor, parseAllowedFontSize } from "./styleConfig";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
+import VariablePlugin from "./plugins/VariablePlugin";
 
 const placeholder = "Write your email here...";
 
@@ -142,29 +146,57 @@ const editorConfig = {
   theme: ExampleTheme,
 };
 
-export default function Editor() {
+export default function Editor({
+  onEditorReady,
+  onChange,
+}: {
+  onEditorReady?: (editor: LexicalEditor) => void;
+  onChange?: () => void;
+}) {
   return (
     <LexicalComposer initialConfig={editorConfig}>
-      <div className="editor-container">
-        <ToolbarPlugin />
-        <div className="editor-inner">
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable
-                className="editor-input"
-                aria-placeholder={placeholder}
-                placeholder={
-                  <div className="editor-placeholder">{placeholder}</div>
-                }
-              />
-            }
-            ErrorBoundary={LexicalErrorBoundary}
-          />
-          <HistoryPlugin />
-          <ListPlugin />
-          <AutoFocusPlugin />
-        </div>
-      </div>
+      <EditorContent onEditorReady={onEditorReady} onChange={onChange} />
     </LexicalComposer>
+  );
+}
+
+function EditorContent({
+  onEditorReady,
+  onChange,
+}: {
+  onEditorReady?: (editor: LexicalEditor) => void;
+  onChange?: () => void;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
+
+  return (
+    <div className="editor-container">
+      <ToolbarPlugin />
+      <div className="editor-inner">
+        <RichTextPlugin
+          contentEditable={
+            <ContentEditable
+              className="editor-input"
+              aria-placeholder={placeholder}
+              placeholder={
+                <div className="editor-placeholder">{placeholder}</div>
+              }
+            />
+          }
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+        <HistoryPlugin />
+        <ListPlugin />
+        <AutoFocusPlugin />
+        <VariablePlugin />
+        {onChange && <OnChangePlugin onChange={onChange} />}
+      </div>
+    </div>
   );
 }

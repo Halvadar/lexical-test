@@ -71,15 +71,11 @@ h1 {
 }
 
 .editor-container {
-  margin: 20px auto 20px auto;
-  border-radius: 10px;
-  max-width: 600px;
   color: #000;
   position: relative;
   line-height: 20px;
   font-weight: 400;
   text-align: left;
-  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
 }
 
 .editor-inner {
@@ -346,6 +342,7 @@ pre::-webkit-scrollbar-thumb {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   margin-bottom: 1px;
   background: #fff;
   padding: 4px;
@@ -408,7 +405,6 @@ pre::-webkit-scrollbar-thumb {
 .toolbar .toolbar-item .text {
   display: flex;
   line-height: 20px;
-  width: 200px;
   vertical-align: middle;
   font-size: 14px;
   color: #777;
@@ -427,44 +423,4 @@ pre::-webkit-scrollbar-thumb {
   margin-right: 8px;
   line-height: 16px;
   background-size: contain;
-}
-
-i.undo {
-  background-image: url(icons/arrow-counterclockwise.svg);
-}
-
-i.redo {
-  background-image: url(icons/arrow-clockwise.svg);
-}
-
-i.bold {
-  background-image: url(icons/type-bold.svg);
-}
-
-i.italic {
-  background-image: url(icons/type-italic.svg);
-}
-
-i.underline {
-  background-image: url(icons/type-underline.svg);
-}
-
-i.strikethrough {
-  background-image: url(icons/type-strikethrough.svg);
-}
-
-i.left-align {
-  background-image: url(icons/text-left.svg);
-}
-
-i.center-align {
-  background-image: url(icons/text-center.svg);
-}
-
-i.right-align {
-  background-image: url(icons/text-right.svg);
-}
-
-i.justify-align {
-  background-image: url(icons/justify.svg);
 }
