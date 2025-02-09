@@ -2,13 +2,8 @@ import { useState, useCallback } from "react";
 
 import "./App.css";
 import Editor from "./components/ui/lexical/Editor";
-import {
-  $isElementNode,
-  $isParagraphNode,
-  LexicalEditor,
-  LexicalNode,
-} from "lexical";
-import { INSERT_VARIABLE_COMMAND } from "@/components/ui/lexical/commands";
+import { $isElementNode, LexicalEditor, LexicalNode } from "lexical";
+
 import {
   Card,
   CardHeader,
@@ -89,19 +84,12 @@ const MESSAGE_TEMPLATES = [
 ];
 
 // Add OpenAI API endpoint
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const BACKEND_API_URL = "http://localhost:3001/api";
 
 function App() {
   const [editor, setEditor] = useState<LexicalEditor | null>(null);
   const [previewContent, setPreviewContent] = useState("");
-  const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-
-  function insertVariable(variable: string) {
-    if (editor) {
-      editor.dispatchCommand(INSERT_VARIABLE_COMMAND, `{{${variable}}}`);
-    }
-  }
 
   function getPreview(content: string) {
     let preview = content;
@@ -120,155 +108,124 @@ function App() {
     }
   };
 
-  const generateAIMessage = useCallback(async () => {
-    if (!aiPrompt.trim()) return;
+  const generateAIMessage = useCallback(
+    async (prompt: string) => {
+      if (!prompt.trim()) return;
 
-    setIsGenerating(true);
-    try {
-      // Create context message with order details
-      const contextMessage = `
-        You are helping a restaurant owner write an email to a customer.
-        Here are the order details:
-        - Customer Name: John Doe
-        - Order ID: #123456
-        - Ordered Items: ${ORDERED_ITEMS.map(
-          (item) => `${item.name} x${item.quantity}`
-        ).join(", ")}
-        - Total: $45.67
-        - Customer Review: "The food was delicious, but delivery took longer than expected."
-        
-        The restaurant owner has provided this prompt: "${aiPrompt}"
-        
-        You can use the following variables in your message:
-        ${TEMPLATE_VARIABLES.map(
-          ({ key, example }) => `- {{${key}}} (Example: ${example})`
-        ).join("\n")}
+      setIsGenerating(true);
+      try {
+        const orderDetails = {
+          customerName: "John Doe",
+          orderId: "#123456",
+          orderedItems: ORDERED_ITEMS.map(
+            (item) => `${item.name} x${item.quantity}`
+          ).join(", "),
+          total: "$45.67",
+          customerReview:
+            "The food was delicious, but delivery took longer than expected.",
+        };
 
-        Don't add subject line to the email.
-        The message should be formatted in HTML. This is an example of the HTML format:
-        <p>Dear {{customerName}},</p>
-        <p>Thank you for your order of {{mealName}}!</p>
-        <p>We hope you enjoy your meal. If you have any questions, please don't hesitate to contact us.</p>
-        <p>Best regards,</p>
-        <p>{{restaurantName}}</p>
-
-        Please generate a professional and friendly email message based on this information.
-      `;
-
-      const response = await fetch(OPENAI_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are an AI assistant that helps restaurant owners write professional emails to their customers.",
-            },
-            {
-              role: "user",
-              content: contextMessage,
-            },
-          ],
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 200,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate message");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Failed to read stream");
-      }
-
-      if (editor) {
-        editor.update(() => {
-          const root = $getRoot();
-          root.clear();
+        const response = await fetch(`${BACKEND_API_URL}/generate-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt,
+            variables: TEMPLATE_VARIABLES,
+            orderDetails,
+          }),
         });
-      }
 
-      let accumulatedContent = "";
+        if (!response.ok) {
+          throw new Error("Failed to generate message");
+        }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        if (editor) {
+          editor.update(() => {
+            const root = $getRoot();
+            root.clear();
+          });
+        }
 
-        const text = new TextDecoder().decode(value);
-        const lines = text.split("\n");
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("Failed to read stream");
+        }
 
-        console.log("lines", lines);
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const json = line.slice(6);
-            if (json === "[DONE]") break;
+        let accumulatedContent = "";
 
-            const data = JSON.parse(json);
-            const content = data.choices[0]?.delta?.content;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-            if (content) {
-              accumulatedContent += content;
+          const text = new TextDecoder().decode(value);
+          const lines = text.split("\n");
 
-              // Only update the editor when we have complete paragraph tags
-              if (accumulatedContent.includes("</p>")) {
-                if (editor) {
-                  editor.update(() => {
-                    const root = $getRoot();
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(
-                      accumulatedContent,
-                      "text/html"
-                    );
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const json = line.slice(6);
+              if (json === "[DONE]") break;
 
-                    // Convert HTML nodes to Lexical nodes
-                    const convertNode = (node: Node): LexicalNode | null => {
-                      if (node.nodeType === Node.TEXT_NODE) {
-                        return $createTextNode(node.textContent || "");
-                      } else if (node.nodeType === Node.ELEMENT_NODE) {
-                        const element = node as HTMLElement;
-                        if (element.tagName === "P") {
-                          const paragraph = $createParagraphNode();
-                          Array.from(element.childNodes).forEach((child) => {
-                            const childNode = convertNode(child);
-                            if (childNode) {
-                              paragraph.append(childNode);
-                            }
-                          });
-                          return paragraph;
+              const data = JSON.parse(json);
+              const content = data.content;
+
+              if (content) {
+                accumulatedContent += content;
+
+                if (accumulatedContent.includes("</p>")) {
+                  if (editor) {
+                    editor.update(() => {
+                      const root = $getRoot();
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(
+                        accumulatedContent,
+                        "text/html"
+                      );
+
+                      // Convert HTML nodes to Lexical nodes
+                      const convertNode = (node: Node): LexicalNode | null => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                          return $createTextNode(node.textContent || "");
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          const element = node as HTMLElement;
+                          if (element.tagName === "P") {
+                            const paragraph = $createParagraphNode();
+                            Array.from(element.childNodes).forEach((child) => {
+                              const childNode = convertNode(child);
+                              if (childNode) {
+                                paragraph.append(childNode);
+                              }
+                            });
+                            return paragraph;
+                          }
                         }
-                      }
-                      return null;
-                    };
+                        return null;
+                      };
 
-                    Array.from(doc.body.childNodes).forEach((node) => {
-                      const lexicalNode = convertNode(node);
-                      if (lexicalNode && $isElementNode(lexicalNode)) {
-                        root.append(lexicalNode);
-                      }
+                      Array.from(doc.body.childNodes).forEach((node) => {
+                        const lexicalNode = convertNode(node);
+                        if (lexicalNode && $isElementNode(lexicalNode)) {
+                          root.append(lexicalNode);
+                        }
+                      });
                     });
-                  });
+                  }
+                  accumulatedContent = "";
                 }
-                accumulatedContent = ""; // Reset accumulated content
               }
             }
           }
         }
+      } catch (error) {
+        console.error("Error generating AI message:", error);
+        alert("Failed to generate message. Please try again.");
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (error) {
-      console.error("Error generating AI message:", error);
-      alert("Failed to generate message. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [aiPrompt, editor]);
+    },
+    [editor]
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -388,8 +345,7 @@ function App() {
                   </DropdownMenu>
                   <AIGeneratorDialog
                     onGenerate={(prompt) => {
-                      setAiPrompt(prompt);
-                      generateAIMessage();
+                      generateAIMessage(prompt);
                     }}
                     isGenerating={isGenerating}
                   />

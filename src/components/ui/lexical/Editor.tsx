@@ -36,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import ExampleTheme from "./ExampleTheme";
+import ExampleTheme from "./exampleTheme";
 import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import { parseAllowedColor, parseAllowedFontSize } from "./styleConfig";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
