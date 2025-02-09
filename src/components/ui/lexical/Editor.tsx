@@ -28,12 +28,20 @@ import { ListItemNode, ListNode } from "@lexical/list";
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import ExampleTheme from "./ExampleTheme";
 import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import { parseAllowedColor, parseAllowedFontSize } from "./styleConfig";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import VariablePlugin from "./plugins/VariablePlugin";
+import { INSERT_VARIABLE_COMMAND } from "./commands";
 
 const placeholder = "Write your email here...";
 
@@ -146,16 +154,24 @@ const editorConfig = {
   theme: ExampleTheme,
 };
 
+interface EditorProps {
+  onEditorReady?: (editor: LexicalEditor) => void;
+  onChange?: () => void;
+  templateVariables: { key: string; label: string }[];
+}
+
 export default function Editor({
   onEditorReady,
   onChange,
-}: {
-  onEditorReady?: (editor: LexicalEditor) => void;
-  onChange?: () => void;
-}) {
+  templateVariables,
+}: EditorProps) {
   return (
     <LexicalComposer initialConfig={editorConfig}>
-      <EditorContent onEditorReady={onEditorReady} onChange={onChange} />
+      <EditorContent
+        onEditorReady={onEditorReady}
+        onChange={onChange}
+        templateVariables={templateVariables}
+      />
     </LexicalComposer>
   );
 }
@@ -163,9 +179,11 @@ export default function Editor({
 function EditorContent({
   onEditorReady,
   onChange,
+  templateVariables,
 }: {
   onEditorReady?: (editor: LexicalEditor) => void;
   onChange?: () => void;
+  templateVariables: { key: string; label: string }[];
 }) {
   const [editor] = useLexicalComposerContext();
 
@@ -175,9 +193,30 @@ function EditorContent({
     }
   }, [editor, onEditorReady]);
 
+  // Add this function to insert variables
+  const insertVariable = (variable: string) => {
+    editor.dispatchCommand(INSERT_VARIABLE_COMMAND, `{{${variable}}}`);
+  };
+
   return (
     <div className="editor-container">
       <ToolbarPlugin />
+      <div className="flex items-center gap-2 p-2 border-b">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              Insert Variable
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {templateVariables.map(({ key, label }) => (
+              <DropdownMenuItem key={key} onClick={() => insertVariable(key)}>
+                {label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="editor-inner">
         <RichTextPlugin
           contentEditable={
