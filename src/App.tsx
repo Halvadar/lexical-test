@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 import "./App.css";
 import Editor from "./components/ui/lexical/Editor";
@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FileText } from "lucide-react";
+import { fetchOrders, fetchOrderDetails, Order } from "@/services/api";
 
 // Define available variables
 const TEMPLATE_VARIABLES = [
@@ -90,6 +91,32 @@ function App() {
   const [editor, setEditor] = useState<LexicalEditor | null>(null);
   const [previewContent, setPreviewContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const data = await fetchOrders();
+        setOrders(data);
+        if (data.length > 0) {
+          setSelectedOrder(data[0]);
+        }
+      } catch (error) {
+        console.error("Failed to load orders:", error);
+      }
+    };
+    loadOrders();
+  }, []);
+
+  const handleOrderSelect = async (orderId: string) => {
+    try {
+      const order = await fetchOrderDetails(orderId);
+      setSelectedOrder(order);
+    } catch (error) {
+      console.error("Failed to load order details:", error);
+    }
+  };
 
   function getPreview(content: string) {
     let preview = content;
@@ -229,147 +256,195 @@ function App() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Add Order Details title */}
-      <h1 className="text-2xl font-bold mb-6">Order Details</h1>
-
-      {/* Order Information Section */}
-      <Card className="mb-10">
-        <CardHeader>
-          <CardTitle>Order Details</CardTitle>
-          <CardDescription>Information about the recent order</CardDescription>
-        </CardHeader>
-        <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Order ID</p>
-            <p className="font-medium">#123456</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Customer Name</p>
-            <p className="font-medium">John Doe</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Order Total</p>
-            <p className="font-medium">$45.67</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Order Rating</p>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium">4.5</span>
-                    <span className="text-yellow-400">★</span>
-                    <span className="text-sm text-muted-foreground">
-                      (based on 3 criteria)
-                    </span>
+      <div className="flex gap-8">
+        <div className="w-80 flex-shrink-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>Past Orders</CardTitle>
+              <CardDescription>Recent customer orders</CardDescription>
+            </CardHeader>
+            <div className="p-4 space-y-2">
+              {orders.map((order) => (
+                <button
+                  key={order.id}
+                  onClick={() => handleOrderSelect(order.id)}
+                  className={`w-full text-left p-2 rounded-md hover:bg-gray-100 ${
+                    selectedOrder?.id === order.id ? "bg-gray-100" : ""
+                  }`}
+                >
+                  <div className="font-medium">{order.customerName}</div>
+                  <div className="text-sm text-gray-500">
+                    #{order.id.slice(0, 8)} - ${order.total.toFixed(2)}
                   </div>
-                </TooltipTrigger>
-                <TooltipContent className="space-y-2">
-                  {RATING_CRITERIA.map((criteria, index) => (
-                    <div key={index} className="flex justify-between gap-4">
-                      <span>{criteria.criterion}</span>
-                      <span className="flex items-center gap-1">
-                        {criteria.rating}
-                        <span className="text-yellow-400">★</span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex-1">
+          {selectedOrder && (
+            <Card className="mb-10">
+              <CardHeader>
+                <CardTitle>Order Details</CardTitle>
+                <CardDescription>
+                  Information about the recent order
+                </CardDescription>
+              </CardHeader>
+              <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Order ID</p>
+                  <p className="font-medium">#{selectedOrder.id.slice(0, 8)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer Name</p>
+                  <p className="font-medium">{selectedOrder.customerName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Order Total</p>
+                  <p className="font-medium">
+                    ${selectedOrder.total.toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Order Rating</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">
+                            {(
+                              selectedOrder.ratings.reduce(
+                                (sum, r) => sum + r.rating,
+                                0
+                              ) / selectedOrder.ratings.length
+                            ).toFixed(1)}
+                          </span>
+                          <span className="text-yellow-400">★</span>
+                          <span className="text-sm text-muted-foreground">
+                            (based on {selectedOrder.ratings.length} criteria)
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="space-y-2">
+                        {selectedOrder.ratings.map((criteria, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between gap-4"
+                          >
+                            <span>{criteria.criterion}</span>
+                            <span className="flex items-center gap-1">
+                              {criteria.rating}
+                              <span className="text-yellow-400">★</span>
+                            </span>
+                          </div>
+                        ))}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+              <div className="p-6 pt-0">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Ordered Items
+                </p>
+                <div className="space-y-2">
+                  {selectedOrder.items.map((item, index) => (
+                    <div key={index} className="flex justify-between">
+                      <div>
+                        <span className="font-medium">{item.name}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          x{item.quantity}
+                        </span>
+                      </div>
+                      <span className="font-medium">
+                        ${item.price.toFixed(2)}
                       </span>
                     </div>
                   ))}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-        <div className="p-6 pt-0">
-          <p className="text-sm text-muted-foreground mb-2">Ordered Items</p>
-          <div className="space-y-2">
-            {ORDERED_ITEMS.map((item, index) => (
-              <div key={index} className="flex justify-between">
-                <div>
-                  <span className="font-medium">{item.name}</span>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    x{item.quantity}
-                  </span>
                 </div>
-                <span className="font-medium">${item.price.toFixed(2)}</span>
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="p-6 pt-0">
-          <p className="text-sm text-muted-foreground mb-2">Customer Review</p>
-          <blockquote className="pl-4 border-l-2 border-muted">
-            "The food was delicious, but delivery took longer than expected."
-          </blockquote>
-        </div>
-      </Card>
+              {selectedOrder.review && (
+                <div className="p-6 pt-0">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Customer Review
+                  </p>
+                  <blockquote className="pl-4 border-l-2 border-muted">
+                    "{selectedOrder.review}"
+                  </blockquote>
+                </div>
+              )}
+            </Card>
+          )}
 
-      {/* Move Email Template Editor title here */}
-      <div className="editor-section">
-        <h1 className="text-2xl font-bold mb-6">Email Template Editor</h1>
+          <div className="editor-section">
+            <h1 className="text-2xl font-bold mb-6">Email Template Editor</h1>
 
-        <div className="flex gap-4 flex-wrap items-stretch">
-          <div className="flex gap-4 flex-col flex-grow flex-shrink-0 basis-[calc(50%-1rem)] max-w-full min-w-[300px] min-h-[300px]">
-            <div className="min-h-20 flex flex-col justify-end">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Tools:</p>
-                <div className="flex gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Templates
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {MESSAGE_TEMPLATES.map((template, index) => (
-                        <DropdownMenuItem
-                          key={index}
-                          onClick={() => {
-                            if (editor) {
-                              editor.update(() => {
-                                const root = $getRoot();
-                                root.clear();
-                                const paragraph = $createParagraphNode();
-                                paragraph.append(
-                                  $createTextNode(template.content)
-                                );
-                                root.append(paragraph);
-                              });
-                            }
-                          }}
-                        >
-                          {template.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <AIGeneratorDialog
-                    onGenerate={(prompt) => {
-                      generateAIMessage(prompt);
-                    }}
-                    isGenerating={isGenerating}
+            <div className="flex gap-4 flex-wrap items-stretch">
+              <div className="flex gap-4 flex-col flex-grow flex-shrink-0 basis-[calc(50%-1rem)] max-w-full min-w-[300px] min-h-[300px]">
+                <div className="min-h-20 flex flex-col justify-end">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-600">Tools:</p>
+                    <div className="flex gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline">
+                            <FileText className="w-4 h-4 mr-2" />
+                            Templates
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {MESSAGE_TEMPLATES.map((template, index) => (
+                            <DropdownMenuItem
+                              key={index}
+                              onClick={() => {
+                                if (editor) {
+                                  editor.update(() => {
+                                    const root = $getRoot();
+                                    root.clear();
+                                    const paragraph = $createParagraphNode();
+                                    paragraph.append(
+                                      $createTextNode(template.content)
+                                    );
+                                    root.append(paragraph);
+                                  });
+                                }
+                              }}
+                            >
+                              {template.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <AIGeneratorDialog
+                        onGenerate={(prompt) => {
+                          generateAIMessage(prompt);
+                        }}
+                        isGenerating={isGenerating}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <Card className="flex-grow">
+                  <Editor
+                    onEditorReady={setEditor}
+                    onChange={updatePreview}
+                    templateVariables={TEMPLATE_VARIABLES}
                   />
+                </Card>
+              </div>
+              <div className="flex gap-4 flex-col flex-grow flex-shrink-0 basis-[calc(50%-1rem)] max-w-full min-w-[300px] min-h-[300px]">
+                <div className="text-xl font-semibold min-h-20  flex-shrink-0 flex items-end justify-end">
+                  Preview
                 </div>
+                <Card className="flex-grow">
+                  <div
+                    className="p-4 h-full"
+                    dangerouslySetInnerHTML={{ __html: previewContent }}
+                  />
+                </Card>
               </div>
             </div>
-            <Card className="flex-grow">
-              <Editor
-                onEditorReady={setEditor}
-                onChange={updatePreview}
-                templateVariables={TEMPLATE_VARIABLES}
-              />
-            </Card>
-          </div>
-          <div className="flex gap-4 flex-col flex-grow flex-shrink-0 basis-[calc(50%-1rem)] max-w-full min-w-[300px] min-h-[300px]">
-            <div className="text-xl font-semibold min-h-20  flex-shrink-0 flex items-end justify-end">
-              Preview
-            </div>
-            <Card className="flex-grow">
-              <div
-                className="p-4 h-full"
-                dangerouslySetInnerHTML={{ __html: previewContent }}
-              />
-            </Card>
           </div>
         </div>
       </div>

@@ -2,8 +2,20 @@ import * as express from "express";
 import * as cors from "cors";
 import { config } from "dotenv";
 import { OpenAI } from "openai";
+import { faker } from "@faker-js/faker";
 
 config();
+
+interface Order {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  items: { name: string; quantity: number; price: number }[];
+  total: number;
+  review?: string;
+  ratings: { criterion: string; rating: number }[];
+  createdAt: string;
+}
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -13,6 +25,35 @@ app.use(express.json());
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Generate mock data
+const generateMockOrder = (): Order => ({
+  id: faker.string.uuid(),
+  customerName: faker.person.fullName(),
+  customerEmail: faker.internet.email(),
+  items: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
+    name: faker.commerce.productName(),
+    quantity: faker.number.int({ min: 1, max: 3 }),
+    price: parseFloat(faker.commerce.price({ min: 5, max: 20 })),
+  })),
+  total: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
+  review: faker.helpers.maybe(() => faker.lorem.sentences(2)),
+  ratings: [
+    {
+      criterion: "Food Quality",
+      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+    },
+    {
+      criterion: "Delivery Time",
+      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+    },
+    {
+      criterion: "Packaging",
+      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+    },
+  ],
+  createdAt: faker.date.recent().toISOString(),
 });
 
 app.post("/api/generate-email", async (req, res) => {
@@ -79,6 +120,17 @@ app.post("/api/generate-email", async (req, res) => {
     console.error("Error generating email:", error);
     res.status(500).json({ error: "Failed to generate email" });
   }
+});
+
+app.get("/api/orders", (req, res) => {
+  const orders = Array.from({ length: 10 }, generateMockOrder);
+  res.json(orders);
+});
+
+app.get("/api/orders/:id", (req, res) => {
+  const order = generateMockOrder();
+  order.id = req.params.id;
+  res.json(order);
 });
 
 app.listen(port, () => {
