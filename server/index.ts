@@ -28,36 +28,46 @@ const openai = new OpenAI({
 });
 
 // Generate mock data
-const generateMockOrder = (): Order => ({
-  orderId: faker.string.uuid(),
-  customerName: faker.person.fullName(),
-  customerEmail: faker.internet.email(),
-  orderedItems: Array.from(
+const generateMockOrder = (): Order => {
+  const orderedItems = Array.from(
     { length: faker.number.int({ min: 1, max: 5 }) },
     () => ({
       name: faker.food.dish(),
       quantity: faker.number.int({ min: 1, max: 3 }),
       price: parseFloat(faker.commerce.price({ min: 5, max: 20 })),
     })
-  ),
-  total: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
-  customerReview: faker.helpers.maybe(() => faker.lorem.sentences(2)),
-  ratings: [
-    {
-      criterion: "Food Quality",
-      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
-    },
-    {
-      criterion: "Delivery Time",
-      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
-    },
-    {
-      criterion: "Packaging",
-      rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
-    },
-  ],
-  createdAt: faker.date.recent().toISOString(),
-});
+  );
+
+  // Calculate total by summing up (price * quantity) for each item
+  const total = orderedItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  return {
+    orderId: faker.string.uuid(),
+    customerName: faker.person.fullName(),
+    customerEmail: faker.internet.email(),
+    orderedItems,
+    total,
+    customerReview: faker.helpers.maybe(() => faker.lorem.sentences(2)),
+    ratings: [
+      {
+        criterion: "Food Quality",
+        rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+      },
+      {
+        criterion: "Delivery Time",
+        rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+      },
+      {
+        criterion: "Packaging",
+        rating: faker.number.float({ min: 3, max: 5, fractionDigits: 1 }),
+      },
+    ],
+    createdAt: faker.date.recent().toISOString(),
+  };
+};
 
 app.post("/api/generate-email", async (req, res) => {
   try {
