@@ -14,12 +14,12 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "nodemon": "^3.1.9",
     "openai": "^4.83.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.4.0",
     "@types/node": "^22.13.1",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.1.9"
   }
 }
