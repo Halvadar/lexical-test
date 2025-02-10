@@ -30,19 +30,29 @@ import { fetchOrders, fetchOrderDetails, Order } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
 // Define available variables
-const TEMPLATE_VARIABLES = [
+const TEMPLATE_VARIABLES_SAMPLE = [
   { key: "customerName", label: "Customer Name", example: "John Doe" },
   {
     key: "customerEmail",
     label: "Customer Email",
     example: "john@example.com",
   },
-  { key: "mealName", label: "Meal Name", example: "Spicy Chicken Bowl" },
   { key: "orderId", label: "Order ID", example: "#123456" },
   {
     key: "orderedItems",
     label: "Ordered Items",
-    example: "Spicy Chicken Bowl, Vegetable Spring Rolls, Green Tea",
+    example: [
+      {
+        name: "Spicy Chicken Bowl",
+        quantity: 1,
+        price: 10.99,
+      },
+      {
+        name: "Vegetable Spring Rolls",
+        quantity: 2,
+        price: 5.99,
+      },
+    ],
   },
   { key: "total", label: "Total", example: "$45.67" },
   {
@@ -50,33 +60,19 @@ const TEMPLATE_VARIABLES = [
     label: "Customer Review",
     example: "The food was delicious, but delivery took longer than expected.",
   },
-  { key: "restaurantName", label: "Restaurant Name", example: "Saffron Grill" },
-];
-
-// Add this constant for ordered items
-const ORDERED_ITEMS = [
-  { name: "Spicy Chicken Bowl", quantity: 1, price: 12.99 },
-  { name: "Vegetable Spring Rolls", quantity: 2, price: 5.99 },
-  { name: "Green Tea", quantity: 1, price: 2.99 },
-];
-
-// Add this constant for rating criteria
-const RATING_CRITERIA = [
-  { criterion: "Food Quality", rating: 4.8 },
-  { criterion: "Delivery Time", rating: 3.9 },
-  { criterion: "Packaging", rating: 4.5 },
 ];
 
 // Add these constants for templates and AI options
 const MESSAGE_TEMPLATES = [
   {
     name: "Thank You",
-    content: "Dear {{customerName}}, thank you for your order of {{mealName}}!",
+    content:
+      "Dear {{customerName}}, thank you for your order of: {{orderedItems}}",
   },
   {
     name: "Feedback Request",
     content:
-      "Hi {{customerName}}, we'd love your feedback on your recent order of {{mealName}}!",
+      "Hi {{customerName}}, we'd love your feedback on your recent order of: {{orderedItems}}",
   },
   {
     name: "Special Offer",
@@ -124,8 +120,20 @@ function App() {
 
   function getPreview(content: string) {
     let preview = content;
-    TEMPLATE_VARIABLES.forEach(({ key, example }) => {
-      preview = preview.replace(new RegExp(`{{${key}}}`, "g"), example);
+    Object.entries(selectedOrder || {}).forEach(([key, value]) => {
+      preview = preview.replace(new RegExp(`{{${key}}}`, "g"), () => {
+        if (Array.isArray(value)) {
+          return `<ul class="editor-list-ul">
+              ${value
+                .map(
+                  (item) =>
+                    `<li class="editor-listitem">${item.name} x${item.quantity} ${item.price}</li>`
+                )
+                .join("")}
+            </ul>`;
+        }
+        return value;
+      });
     });
     return preview;
   }
@@ -147,14 +155,13 @@ function App() {
       setIsGenerating(true);
       try {
         const orderDetails = {
-          customerName: "John Doe",
-          orderId: "#123456",
-          orderedItems: ORDERED_ITEMS.map(
-            (item) => `${item.name} x${item.quantity}`
-          ).join(", "),
-          total: "$45.67",
-          customerReview:
-            "The food was delicious, but delivery took longer than expected.",
+          customerName: selectedOrder?.customerName || "John Doe",
+          orderId: selectedOrder?.orderId || "#123456",
+          orderedItems: selectedOrder?.orderedItems
+            .map((item) => `${item.name} x${item.quantity}`)
+            .join(", "),
+          total: selectedOrder?.total.toFixed(2) || "$45.67",
+          customerReview: selectedOrder?.customerReview || "",
         };
 
         const response = await fetch(`${BACKEND_API_URL}/generate-email`, {
@@ -164,7 +171,7 @@ function App() {
           },
           body: JSON.stringify({
             prompt,
-            variables: TEMPLATE_VARIABLES,
+            variables: TEMPLATE_VARIABLES_SAMPLE,
             orderDetails,
           }),
         });
@@ -256,7 +263,7 @@ function App() {
         setIsGenerating(false);
       }
     },
-    [editor]
+    [editor, selectedOrder]
   );
 
   const handleSendEmail = () => {
@@ -283,15 +290,17 @@ function App() {
             <div className="p-4 space-y-2">
               {orders.map((order) => (
                 <button
-                  key={order.id}
-                  onClick={() => handleOrderSelect(order.id)}
+                  key={order.orderId}
+                  onClick={() => handleOrderSelect(order.orderId)}
                   className={`w-full text-left p-2 rounded-md hover:bg-gray-100 ${
-                    selectedOrder?.id === order.id ? "bg-gray-100" : ""
+                    selectedOrder?.orderId === order.orderId
+                      ? "bg-gray-100"
+                      : ""
                   }`}
                 >
                   <div className="font-medium">{order.customerName}</div>
                   <div className="text-sm text-gray-500">
-                    #{order.id.slice(0, 8)} - ${order.total.toFixed(2)}
+                    #{order.orderId.slice(0, 8)} - ${order.total.toFixed(2)}
                   </div>
                 </button>
               ))}
@@ -311,7 +320,9 @@ function App() {
               <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Order ID</p>
-                  <p className="font-medium">#{selectedOrder.id.slice(0, 8)}</p>
+                  <p className="font-medium">
+                    #{selectedOrder.orderId.slice(0, 8)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Customer Name</p>
@@ -366,7 +377,7 @@ function App() {
                   Ordered Items
                 </p>
                 <div className="space-y-2">
-                  {selectedOrder.items.map((item, index) => (
+                  {selectedOrder.orderedItems.map((item, index) => (
                     <div key={index} className="flex justify-between">
                       <div>
                         <span className="font-medium">{item.name}</span>
@@ -381,13 +392,13 @@ function App() {
                   ))}
                 </div>
               </div>
-              {selectedOrder.review && (
+              {selectedOrder.customerReview && (
                 <div className="p-6 pt-0">
                   <p className="text-sm text-muted-foreground mb-2">
                     Customer Review
                   </p>
                   <blockquote className="pl-4 border-l-2 border-muted">
-                    "{selectedOrder.review}"
+                    "{selectedOrder.customerReview}"
                   </blockquote>
                 </div>
               )}
@@ -446,7 +457,10 @@ function App() {
                   <Editor
                     onEditorReady={setEditor}
                     onChange={updatePreview}
-                    templateVariables={TEMPLATE_VARIABLES}
+                    templateVariables={TEMPLATE_VARIABLES_SAMPLE.filter(
+                      (variable) =>
+                        Object.keys(selectedOrder || {}).includes(variable.key)
+                    )}
                   />
                 </Card>
               </div>

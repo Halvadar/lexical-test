@@ -230,9 +230,8 @@ function EditorContent({
           }
           ErrorBoundary={LexicalErrorBoundary}
         />
-        <HistoryPlugin />
         <ListPlugin />
-        <AutoFocusPlugin />
+        <HistoryPlugin />
         <VariablePlugin />
         {onChange && <OnChangePlugin onChange={onChange} />}
       </div>

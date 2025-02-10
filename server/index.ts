@@ -7,12 +7,12 @@ import { faker } from "@faker-js/faker";
 config();
 
 interface Order {
-  id: string;
+  orderId: string;
   customerName: string;
   customerEmail: string;
-  items: { name: string; quantity: number; price: number }[];
+  orderedItems: { name: string; quantity: number; price: number }[];
   total: number;
-  review?: string;
+  customerReview?: string;
   ratings: { criterion: string; rating: number }[];
   createdAt: string;
 }
@@ -29,16 +29,19 @@ const openai = new OpenAI({
 
 // Generate mock data
 const generateMockOrder = (): Order => ({
-  id: faker.string.uuid(),
+  orderId: faker.string.uuid(),
   customerName: faker.person.fullName(),
   customerEmail: faker.internet.email(),
-  items: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
-    name: faker.food.dish(),
-    quantity: faker.number.int({ min: 1, max: 3 }),
-    price: parseFloat(faker.commerce.price({ min: 5, max: 20 })),
-  })),
+  orderedItems: Array.from(
+    { length: faker.number.int({ min: 1, max: 5 }) },
+    () => ({
+      name: faker.food.dish(),
+      quantity: faker.number.int({ min: 1, max: 3 }),
+      price: parseFloat(faker.commerce.price({ min: 5, max: 20 })),
+    })
+  ),
   total: faker.number.float({ min: 10, max: 100, fractionDigits: 2 }),
-  review: faker.helpers.maybe(() => faker.lorem.sentences(2)),
+  customerReview: faker.helpers.maybe(() => faker.lorem.sentences(2)),
   ratings: [
     {
       criterion: "Food Quality",
@@ -129,7 +132,7 @@ app.get("/api/orders", (req, res) => {
 
 app.get("/api/orders/:id", (req, res) => {
   const order = generateMockOrder();
-  order.id = req.params.id;
+  order.orderId = req.params.id;
   res.json(order);
 });
 

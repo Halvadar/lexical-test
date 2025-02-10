@@ -1,12 +1,12 @@
 const API_BASE_URL = "http://localhost:3001/api";
 
 export interface Order {
-  id: string;
+  orderId: string;
   customerName: string;
   customerEmail: string;
-  items: { name: string; quantity: number; price: number }[];
+  orderedItems: { name: string; quantity: number; price: number }[];
   total: number;
-  review?: string;
+  customerReview?: string;
   ratings: { criterion: string; rating: number }[];
   createdAt: string;
 }
