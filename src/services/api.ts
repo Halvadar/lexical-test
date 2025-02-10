@@ -9,6 +9,7 @@ export interface Order {
   customerReview?: string;
   ratings: { criterion: string; rating: number }[];
   createdAt: string;
+  restaurantName: string;
 }
 
 export const fetchOrders = async (): Promise<Order[]> => {

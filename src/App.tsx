@@ -25,9 +25,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText, Send, Loader2 } from "lucide-react";
+import { FileText, Send, Loader2, Menu } from "lucide-react";
 import { fetchOrders, fetchOrderDetails, Order } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { $createListNode, $createListItemNode } from "@lexical/list";
 
 // Define available variables
 const TEMPLATE_VARIABLES_SAMPLE = [
@@ -65,24 +67,155 @@ const TEMPLATE_VARIABLES_SAMPLE = [
 // Add these constants for templates and AI options
 const MESSAGE_TEMPLATES = [
   {
-    name: "Thank You",
-    content:
-      "Dear {{customerName}}, thank you for your order of: {{orderedItems}}",
-  },
-  {
     name: "Feedback Request",
-    content:
-      "Hi {{customerName}}, we'd love your feedback on your recent order of: {{orderedItems}}",
+    content: `
+      <p>Hi {{customerName}},</p>
+      <p>We hope you enjoyed your recent order from {{restaurantName}}! We're always looking to improve, and your feedback would be invaluable to us.</p>
+      <p>Would you take a moment to share your experience? We'd love to hear about:</p>
+      <ul>
+        <li>How was the quality of your food?</li>
+        <li>How was our service?</li>
+        <li>Any suggestions for improvement?</li>
+      </ul>
+      <p>As a token of our appreciation, here's a 10% discount code for your next order: THANKYOU10</p>
+      <p>We look forward to serving you again soon!</p>
+      <p>Best regards,</p>
+      <p>The {{restaurantName}} Team</p>
+    `,
   },
   {
     name: "Special Offer",
-    content:
-      "Hello {{customerName}}, as a valued customer, here's a special offer for your next order!",
+    content: `
+      <p>Hello {{customerName}},</p>
+      <p>As a valued customer, we're excited to offer you an exclusive deal!</p>
+      <p>For the next 7 days, enjoy 20% off your next order with code: SPECIAL20</p>
+      <p>Here are some of our current favorites you might enjoy:</p>
+      <ul>
+        <li>Signature Dish - $15.99</li>
+        <li>Chef's Special - $12.99</li>
+        <li>Seasonal Delight - $10.99</li>
+      </ul>
+      <p>This offer is our way of saying thank you for your continued support. We look forward to serving you again soon!</p>
+      <p>Warm regards,</p>
+      <p>The {{restaurantName}} Team</p>
+    `,
+  },
+  {
+    name: "Order Follow-Up",
+    content: `
+      <p>Dear {{customerName}},</p>
+      <p>We hope you're enjoying your recent order from {{restaurantName}}! We wanted to check in and make sure everything was to your satisfaction.</p>
+      <p>If you experienced any issues or have any feedback, please don't hesitate to reply to this email. Your satisfaction is our top priority!</p>
+      <p>As a thank you for being a valued customer, here's a special offer for your next order:</p>
+      <p>Use code FOLLOWUP15 for 15% off your next purchase within the next 14 days.</p>
+      <p>We look forward to serving you again soon!</p>
+      <p>Best regards,</p>
+      <p>The {{restaurantName}} Team</p>
+    `,
+  },
+  {
+    name: "Loyalty Reward",
+    content: `
+      <p>Hi {{customerName}},</p>
+      <p>We noticed you've been a loyal customer of {{restaurantName}}, and we wanted to say thank you!</p>
+      <p>As a token of our appreciation, we're excited to offer you:</p>
+      <ul>
+        <li>A free dessert on your next order</li>
+        <li>15% off your next purchase with code: LOYAL15</li>
+        <li>Exclusive early access to our new menu items</li>
+      </ul>
+      <p>We truly value your continued support and look forward to serving you again soon!</p>
+      <p>Warm regards,</p>
+      <p>The {{restaurantName}} Team</p>
+    `,
   },
 ];
 
 // Add OpenAI API endpoint
 const BACKEND_API_URL = "http://localhost:3001/api";
+
+// Add this helper function to convert HTML to Lexical nodes
+const convertHtmlToLexicalNodes = (html: string): LexicalNode[] => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const nodes: LexicalNode[] = [];
+
+  const convertNode = (node: Node): LexicalNode | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return $createTextNode(node.textContent || "");
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement;
+      switch (element.tagName) {
+        case "P": {
+          const paragraph = $createParagraphNode();
+          Array.from(element.childNodes).forEach((child) => {
+            const childNode = convertNode(child);
+            if (childNode) {
+              paragraph.append(childNode);
+            }
+          });
+          return paragraph;
+        }
+        case "UL":
+        case "OL": {
+          const list = $createListNode(
+            element.tagName === "UL" ? "bullet" : "number"
+          );
+          Array.from(element.children).forEach((li) => {
+            const listItem = $createListItemNode();
+            Array.from(li.childNodes).forEach((child) => {
+              const childNode = convertNode(child);
+              if (childNode) {
+                listItem.append(childNode);
+              }
+            });
+            list.append(listItem);
+          });
+          return list;
+        }
+        case "LI": {
+          const listItem = $createListItemNode();
+          Array.from(element.childNodes).forEach((child) => {
+            const childNode = convertNode(child);
+            if (childNode) {
+              listItem.append(childNode);
+            }
+          });
+          return listItem;
+        }
+        case "STRONG":
+        case "B": {
+          const boldText = $createTextNode(element.textContent || "");
+          boldText.toggleFormat("bold");
+          return boldText;
+        }
+        case "EM":
+        case "I": {
+          const italicText = $createTextNode(element.textContent || "");
+          italicText.toggleFormat("italic");
+          return italicText;
+        }
+        case "U": {
+          const underlineText = $createTextNode(element.textContent || "");
+          underlineText.toggleFormat("underline");
+          return underlineText;
+        }
+        default:
+          return $createTextNode(element.textContent || "");
+      }
+    }
+    return null;
+  };
+
+  Array.from(doc.body.childNodes).forEach((node) => {
+    const lexicalNode = convertNode(node);
+    if (lexicalNode) {
+      nodes.push(lexicalNode);
+    }
+  });
+
+  return nodes;
+};
 
 function App() {
   const [editor, setEditor] = useState<LexicalEditor | null>(null);
@@ -113,6 +246,16 @@ function App() {
     try {
       const order = await fetchOrderDetails(orderId);
       setSelectedOrder(order);
+
+      // Clear the editor
+      if (editor) {
+        editor.update(() => {
+          const root = $getRoot();
+          root.clear();
+        });
+      }
+      setPreviewContent("");
+      setEmailContent("");
     } catch (error) {
       console.error("Failed to load order details:", error);
     }
@@ -275,13 +418,65 @@ function App() {
         description:
           "The email has been successfully sent to the customer (not really).",
       });
-    }, 1500); // Simulate a 1.5 second delay
+
+      // Clear the editor after sending
+      if (editor) {
+        editor.update(() => {
+          const root = $getRoot();
+          root.clear();
+        });
+      }
+      setPreviewContent("");
+      setEmailContent("");
+    }, 1500);
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex gap-8">
-        <div className="w-80 flex-shrink-0">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Mobile Sidebar Toggle */}
+        <div className="lg:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="mb-4">
+                <Menu className="w-4 h-4 mr-2" />
+                Orders
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[300px]">
+              <Card className="border-none shadow-none">
+                <CardHeader>
+                  <CardTitle>Past Orders</CardTitle>
+                  <CardDescription>Recent customer orders</CardDescription>
+                </CardHeader>
+                <div className="p-4 space-y-2">
+                  {orders.map((order) => (
+                    <button
+                      key={order.orderId}
+                      onClick={() => {
+                        handleOrderSelect(order.orderId);
+                        document.dispatchEvent(new Event("sheet.close"));
+                      }}
+                      className={`w-full text-left p-2 rounded-md hover:bg-gray-100 ${
+                        selectedOrder?.orderId === order.orderId
+                          ? "bg-gray-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="font-medium">{order.customerName}</div>
+                      <div className="text-sm text-gray-500">
+                        #{order.orderId.slice(0, 8)} - ${order.total.toFixed(2)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </Card>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-80 flex-shrink-0">
           <Card>
             <CardHeader>
               <CardTitle>Past Orders</CardTitle>
@@ -308,6 +503,7 @@ function App() {
           </Card>
         </div>
 
+        {/* Main Content */}
         <div className="flex-1">
           {selectedOrder && (
             <Card className="mb-10">
@@ -430,11 +626,18 @@ function App() {
                                   editor.update(() => {
                                     const root = $getRoot();
                                     root.clear();
-                                    const paragraph = $createParagraphNode();
-                                    paragraph.append(
-                                      $createTextNode(template.content)
+
+                                    // Convert HTML to Lexical nodes
+                                    const nodes = convertHtmlToLexicalNodes(
+                                      template.content
                                     );
-                                    root.append(paragraph);
+
+                                    // Append all nodes to the root
+                                    nodes.forEach((node) => {
+                                      if ($isElementNode(node)) {
+                                        root.append(node);
+                                      }
+                                    });
                                   });
                                 }
                               }}

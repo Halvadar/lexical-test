@@ -15,6 +15,7 @@ interface Order {
   customerReview?: string;
   ratings: { criterion: string; rating: number }[];
   createdAt: string;
+  restaurantName: string;
 }
 
 const app = express();
@@ -66,6 +67,7 @@ const generateMockOrder = (): Order => {
       },
     ],
     createdAt: faker.date.recent().toISOString(),
+    restaurantName: "The Saffron Grill",
   };
 };
 
@@ -96,6 +98,8 @@ app.post("/api/generate-email", async (req, res) => {
       <p>We hope you enjoy your meal. If you have any questions, please don't hesitate to contact us.</p>
       <p>Best regards,</p>
       <p>{{restaurantName}}</p>
+
+      Do not use any other variables than the ones provided in the order details.
 
       Please generate a professional and friendly email message based on this information.
     `;
