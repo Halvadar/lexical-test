@@ -25,8 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileText } from "lucide-react";
+import { FileText, Send, Loader2 } from "lucide-react";
 import { fetchOrders, fetchOrderDetails, Order } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 // Define available variables
 const TEMPLATE_VARIABLES = [
@@ -93,6 +94,9 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { toast } = useToast();
+  const [isSending, setIsSending] = useState(false);
+  const [emailContent, setEmailContent] = useState("");
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -130,6 +134,7 @@ function App() {
     if (editor) {
       editor.getEditorState().read(() => {
         const content = editor.getRootElement()?.innerHTML || "";
+        setEmailContent(content);
         setPreviewContent(getPreview(content));
       });
     }
@@ -253,6 +258,18 @@ function App() {
     },
     [editor]
   );
+
+  const handleSendEmail = () => {
+    setIsSending(true);
+    setTimeout(() => {
+      setIsSending(false);
+      toast({
+        title: "Email Sent",
+        description:
+          "The email has been successfully sent to the customer (not really).",
+      });
+    }, 1500); // Simulate a 1.5 second delay
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -434,7 +451,7 @@ function App() {
                 </Card>
               </div>
               <div className="flex gap-4 flex-col flex-grow flex-shrink-0 basis-[calc(50%-1rem)] max-w-full min-w-[300px] min-h-[300px]">
-                <div className="text-xl font-semibold min-h-20  flex-shrink-0 flex items-end justify-end">
+                <div className="text-xl font-semibold min-h-20 flex-shrink-0 flex items-end justify-end">
                   Preview
                 </div>
                 <Card className="flex-grow">
@@ -444,6 +461,20 @@ function App() {
                   />
                 </Card>
               </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button
+                onClick={handleSendEmail}
+                className="w-48"
+                disabled={isSending || !emailContent.trim()}
+              >
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isSending ? "Sending..." : "Send Email"}
+              </Button>
             </div>
           </div>
         </div>

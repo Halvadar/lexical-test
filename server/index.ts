@@ -33,7 +33,7 @@ const generateMockOrder = (): Order => ({
   customerName: faker.person.fullName(),
   customerEmail: faker.internet.email(),
   items: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
-    name: faker.commerce.productName(),
+    name: faker.food.dish(),
     quantity: faker.number.int({ min: 1, max: 3 }),
     price: parseFloat(faker.commerce.price({ min: 5, max: 20 })),
   })),
